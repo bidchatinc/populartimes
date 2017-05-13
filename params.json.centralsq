@@ -1,0 +1,16 @@
+{
+	"API_key": "AIzaSyAGvsYXQm6t5BvFXk-EC0FRNSk9RSzZ1q8",
+	"bounds": [{
+		"lat": 42.3636,
+		"lng": -71.0999
+	}, {
+		"lat": 42.4242,
+		"lng": -70.1111
+	}],
+	"radius": 180,
+	"types": ["bar", "restaurant"],
+	"dbPort": 27017,
+	"dbName": "local",
+	"collectionName": "kroud"
+}
+
