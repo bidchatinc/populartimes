@@ -17,17 +17,17 @@ from selenium.webdriver.chrome.options import Options
 
 class BrowserScrape:
     css_keys = {
-        "value": "widget-pane-section-popular-times-value",
-        "label": "widget-pane-section-popular-times-label",
-        "container": "widget-pane-section-popular-times-graph",
-        "bar": "widget-pane-section-popular-times-bar",
+        "value": "section-popular-times-value",
+        "label": "section-popular-times-label",
+        "container": "section-popular-times-graph",
+        "bar": "section-popular-times-bar",
         "search": ".searchbox-searchbutton",
-        "section": ".widget-pane-section-popular-times"
+        "section": ".section-popular-times"
     }
 
     # adjust depending on internet connection
-    delaySB = 3
-    delayPT = 5
+    delaySB = 8
+    delayPT = 10
 
     def __init__(self):
         chrome_options = Options()
@@ -46,7 +46,6 @@ class BrowserScrape:
 
         for j, container in enumerate(timebars):
 
-            # get popularity from value container
             value_container = container.find("div", class_=self.css_keys["value"])
 
             try:
@@ -59,16 +58,19 @@ class BrowserScrape:
                 # get time from times label
                 label_container = container.find("div", class_=self.css_keys["label"])
                 time = re.sub("<[^>]+>", "", str(label_container)).strip(" Uhr")
-
                 if defined_time is None and len(time) > 0:
                     defined_time = (j, int(time))
 
             # no info available for this day
             except ValueError:
-                break
+                continue
+#                break RGD change
+
 
         # update popularities starting from first defined time
         for j, popularity in enumerate(popularities):
+            if defined_time is None:
+                continue
             popularity["time"] = defined_time[1] + (j - defined_time[0]) % 24
 
         return {"weekday": calendar.day_name[instance],
@@ -77,8 +79,7 @@ class BrowserScrape:
 
     def get_popular_times(self, searchterm):
 
-        pageurl = "http://www.google.de/maps/place/{}".format(searchterm)
-
+        pageurl = "http://www.google.com/maps/place/{}".format(searchterm)
         try:
             self.driver.get(pageurl)
 
@@ -114,4 +115,4 @@ class BrowserScrape:
             times_daily = day.find_all("div", class_=self.css_keys["bar"])
             times_weekly.append(BrowserScrape.get_single_day(self, (i + 6) % 7, times_daily))
 
-        return json.dumps(times_weekly, indent=4, sort_keys=True)
+        return json.dumps(times_weekly, indent=4, sort_keys=True), times_weekly
