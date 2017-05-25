@@ -5,6 +5,7 @@ import timeit
 import os
 import boto
 import attr
+import ast
 from boto import dynamodb2
 from boto.dynamodb2.table import Table
 import requests
@@ -83,7 +84,11 @@ def load_data():
 
                 try:
                     pTimes, weekTot = crawler.get_popular_times(searchterm)
-
+                   
+                    locit = detail["geometry"]
+                    for k, v in locit.items():
+                        locit[k] = str(v)
+                    
                     d, e = compute_average(str(weekTot))
                     if d < 50:
                         day = "15<"
@@ -97,12 +102,14 @@ def load_data():
                         table.put_item(data={"placeID": str(detail["place_id"]),
                                           "name": detail["name"],
                                           "address": str(detail["formatted_address"]),
-                                          "location": str(detail["geometry"]),
+                                          #"location": str(detail["geometry"]),
+                                           "location" : locit,
                                           "types": str(detail["types"]),
                                           "rating": str(detail["rating"]) if "rating" in detail else -1,
                                           "noonToSix": day,
                                           "sixToMid": eve,
-                                          "popularTimes": str(json.loads(pTimes))})
+                                   #       "popularTimes": str(json.loads(pTimes))})
+                                          "popularTimes": json.loads(pTimes)[2]})
 
                     except:
                         print("Put Item Failed")
