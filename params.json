@@ -1,11 +1,11 @@
 {
 	"API_key": "AIzaSyAGvsYXQm6t5BvFXk-EC0FRNSk9RSzZ1q8",
 	"bounds": [{
-		"lat": 37.773972,
-		"lng": -122.431297
+		"lat": 42.365206,
+		"lng": -71.090802
 	}, {
-		"lat": 37.872972,
-		"lng": -121.231297
+		"lat": 42.366206,
+		"lng": -70.1111
 	}],
 	"radius": 180,
 	"types": ["bar", "restaurant"],

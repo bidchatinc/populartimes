@@ -6,6 +6,8 @@ import os
 import boto
 import attr
 import ast
+import calendar
+import decimal
 from boto import dynamodb2
 from boto.dynamodb2.table import Table
 import requests
@@ -46,10 +48,108 @@ def compute_average(week):
             i += 1
     return ((dayAvg/9)/7), ((eveAvg/7)/7)
 
+def map_hour_to_range_string(hour):
+    range_map={
+        0 : "06-07",
+        1 : "07-08",
+        2 : "08-09",
+        3 : "09-10",
+        4 : "10-11",
+        5 : "11-12",
+        6 : "12-13",
+        7 : "13-14",
+        8 : "14-15",
+        9 : "15-16",
+        10 : "16-17",
+        11 : "17-18",
+        12 : "18-19",
+        13 : "19-20",
+        14 : "20-21",
+        15 : "21-22",
+        16 : "22-23",
+        17 : "23-24",
+        }
+    return range_map[hour]
+
+def map_days(val):
+    day_map = {
+        0 : "Sunday",
+        1 : "Monday",
+        2 : "Tuesday",
+        3 : "Wednesday",
+        4 : "Thursday",
+        5 : "Friday",
+        6 : "Saturday"
+        }
+    return day_map[val]
+
+
+def build_popular_times_map(week):
+    calendar.setfirstweekday(calendar.SUNDAY)
+    popular_map = {}
+    popular_time = {}
+    week = week.replace("'", "\"")
+    jobj = json.loads(week)
+    d = 0
+    while(d < 7):
+        tobj = json.loads(json.dumps(jobj[d]["data"]))
+        #day = calendar.day_name[d]
+        day = map_days(d)
+        d += 1
+        i = 0
+        while(i < len(tobj)):
+           # popular_time[str(i)] = tobj[i]["popularity"]
+            #print tobj[i]["popularity"]
+            if tobj[i]["popularity"] == 0:
+                #print "continuing!!!!!!!!!!!!!!"
+                i += 1
+                continue
+            popular_time[map_hour_to_range_string(i)] = tobj[i]["popularity"]
+            i += 1
+        popular_map[day] = popular_time
+   # print popular_map
+    return popular_map
+
+def build_wait_times_map(week):
+    wait_map = {}
+    popular_time = {}
+    week = week.replace("'", "\"")
+    jobj = json.loads(week)
+
+    d = 0
+    while(d < 7):
+        tobj = json.loads(json.dumps(jobj[d]["data"]))
+        #day = calendar.day_name[d]
+        day = map_days(d)
+        d += 1
+        i = 0
+        ret = 0
+        while(i < len(tobj)):
+            # popular_time[str(i)] = tobj[i]["popularity"]
+            #print tobj[i]["popularity"]
+            if tobj[i]["popularity"] == 0:
+                #print "continuing!!!!!!!!!!!!!!"
+                i += 1
+                continue
+            if tobj[i]["popularity"] < 50:
+                ret = 5
+            if tobj[i]["popularity"] > 50 and tobj[i]["popularity"] < 80:
+                ret = 10
+            if tobj[i]["popularity"] > 80:
+                ret = 20
+            popular_time[map_hour_to_range_string(i)] = ret
+            i += 1
+        wait_map[day] = popular_time
+    print wait_map
+    return wait_map
+
 def load_data():
     n_available = 0
     n_unavailable = 0
-
+    locmap = {}
+    bacmap = {}
+    lacmap = {}
+    facmap = {}
     conn = dynamodb2.connect_to_region(
     REGION,
     aws_access_key_id=os.environ['AWS_AC_KEY'],
@@ -81,45 +181,62 @@ def load_data():
                                                  auth=('user', 'pass')).text)["result"]
 
                 searchterm = "{} {}".format(detail["name"], detail["formatted_address"])
+                try:
+                    openHour =  detail["opening_hours"]["weekday_text"]
+                except:
+                    print "No Opening Hours Listed"
 
                 try:
                     pTimes, weekTot = crawler.get_popular_times(searchterm)
                    
                     locit = detail["geometry"]
+                    
+                    c = 0
                     for k, v in locit.items():
                         locit[k] = str(v)
-                    
+                        if c == 0:
+                            locmap[k] = v
+                            
+                            locmap[k]["lat"] = decimal.Decimal(str(locmap[k]["lat"]))
+                            locmap[k]["lng"] = decimal.Decimal(str(locmap[k]["lng"]))
+                        if c > 0:
+                            bacmap[k] = v
+                            bacmap[k]["northeast"]["lat"] = decimal.Decimal(str((bacmap[k]["northeast"]["lat"])))
+                            bacmap[k]["northeast"]["lng"] = decimal.Decimal(str((bacmap[k]["northeast"]["lng"])))
+                            bacmap[k]["southwest"]["lat"] = decimal.Decimal(str((bacmap[k]["southwest"]["lat"])))
+                            bacmap[k]["southwest"]["lng"] = decimal.Decimal(str((bacmap[k]["southwest"]["lng"])))
+                            print bacmap
+                        c += 1
+
+                    tacmap = dict(locmap.items() + bacmap.items())
+                    #print locmap
+                    waitTime = build_wait_times_map(str(weekTot))
+
                     d, e = compute_average(str(weekTot))
-                    if d < 50:
-                        day = "15<"
-                    else:
-                        day = "30<"
-                    if e < 50:
-                        eve = "15<"
-                    else:
-                        eve = "30<"
+                    poptime =  build_popular_times_map(str(weekTot))
+
                     try:
                         table.put_item(data={"placeID": str(detail["place_id"]),
-                                          "name": detail["name"],
-                                          "address": str(detail["formatted_address"]),
-                                          #"location": str(detail["geometry"]),
-                                           "location" : locit,
-                                          "types": str(detail["types"]),
-                                          "rating": str(detail["rating"]) if "rating" in detail else -1,
-                                          "noonToSix": day,
-                                          "sixToMid": eve,
-                                   #       "popularTimes": str(json.loads(pTimes))})
-                                          "popularTimes": json.loads(pTimes)[2]})
+                            "address": str(detail["formatted_address"]),
+                            "location" : tacmap,
+                            "name": detail["name"],
+                            "types": detail["types"],
+                            "rating": str(detail["rating"]) if "rating" in detail else -1,
+                            "waitTimes": waitTime,
+                            "popularTimes": poptime,
+                            "openHours": openHour})
 
                     except:
                         print("Put Item Failed")
                     print("+ {}".format(searchterm))
+                    #print ret
                     #print(crawler.get_popular_times(searchterm))
                     n_available += 1
 
                 except BrowserScrape.NoPopularTimesAvailable:
                     print("no popular times!!!!!!!!!!!!!!!!!!!!")
                     print("- {}".format(searchterm))
+                    continue
                     try:
                         table.put_item(data={"placeID": str(detail["place_id"]),
                                           "name": detail["name"],
