@@ -142,7 +142,21 @@ def build_wait_times_map(week):
         wait_map[day] = popular_time
     print wait_map
     return wait_map
+def build_open_time(times):
+    open_map = {}
+    for a in times:
+        #print "close"
+        #print(a["close"])
+        #print "open"
+        #print(a["open"])
+    
+        open_map.update({map_days(a["open"]["day"]):[{"open" : int(a["open"]["time"]),"close" : int(a["close"]["time"])}]})
 
+    print "open_map"
+    print open_map
+    return open_map
+    
+    
 def load_data():
     n_available = 0
     n_unavailable = 0
@@ -179,10 +193,12 @@ def load_data():
                 # places api - detail search
                 detail = json.loads(requests.get(placeRequestUrl.format(place["place_id"], params["API_key"]),
                                                  auth=('user', 'pass')).text)["result"]
-
+                #print detail
                 searchterm = "{} {}".format(detail["name"], detail["formatted_address"])
                 try:
-                    openHour =  detail["opening_hours"]["weekday_text"]
+                    openHour =  detail["opening_hours"]["periods"]
+                    hour_map = build_open_time(openHour)
+                    print openHour
                 except:
                     print "No Opening Hours Listed"
 
@@ -224,7 +240,7 @@ def load_data():
                             "rating": str(detail["rating"]) if "rating" in detail else -1,
                             "waitTimes": waitTime,
                             "popularTimes": poptime,
-                            "openHours": openHour})
+                            "openHours": hour_map})
 
                     except:
                         print("Put Item Failed")
